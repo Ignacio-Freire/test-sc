@@ -1,5 +1,4 @@
 name: Compare gas costs
-description: Compare gas costs between branches
 inputs:
   token:
     description: github token

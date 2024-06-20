@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - next-v*
       - release-v*
   pull_request: {}
   workflow_dispatch: {}
@@ -14,13 +13,13 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_OPTIONS: --max_old_space_size=8192
+  NODE_OPTIONS: --max_old_space_size=5120
 
 jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - name: Set up environment
         uses: ./.github/actions/setup
       - run: npm run lint
@@ -29,12 +28,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       FORCE_COLOR: 1
-      # Needed for "eth-gas-reporter" to produce a "gasReporterOutput.json" as documented in
-      # https://github.com/cgewecke/eth-gas-reporter/blob/v0.2.27/docs/gasReporterOutput.md
-      CI: true
       GAS: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - name: Set up environment
         uses: ./.github/actions/setup
       - name: Run tests and generate gas report
@@ -53,15 +49,11 @@ jobs:
     env:
       FORCE_COLOR: 1
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
           fetch-depth: 0 # Include history so patch conflicts are resolved automatically
       - name: Set up environment
         uses: ./.github/actions/setup
-      - name: Copy non-upgradeable contracts as dependency
-        run: |
-          mkdir -p lib/openzeppelin-contracts
-          cp -rnT contracts lib/openzeppelin-contracts/contracts
       - name: Transpile to upgradeable
         run: bash scripts/upgradeable/transpile.sh
       - name: Run tests
@@ -70,63 +62,50 @@ jobs:
         run: npm run test:inheritance
       - name: Check storage layout
         uses: ./.github/actions/storage-layout
-        continue-on-error: ${{ contains(github.event.pull_request.labels.*.name, 'breaking change') }}
         with:
           token: ${{ github.token }}
 
   tests-foundry:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
-      - name: Set up environment
-        uses: ./.github/actions/setup
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
       - name: Run tests
         run: forge test -vv
 
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - name: Set up environment
         uses: ./.github/actions/setup
-      - name: Run coverage
-        run: npm run coverage
-      - uses: codecov/codecov-action@v4
-        env:
-          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
-
-  harnesses:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up environment
-        uses: ./.github/actions/setup
-      - name: Compile harnesses
-        run: |
-          make -C certora apply
-          npm run compile:harnesses
+      - run: npm run coverage
+      - uses: codecov/codecov-action@v3
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   slither:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - name: Set up environment
         uses: ./.github/actions/setup
       - run: rm foundry.toml
-      - uses: crytic/slither-action@v0.4.0
+      - uses: crytic/slither-action@v0.3.0
         with:
           node-version: 18.15
-          slither-version: 0.10.1
 
   codespell:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - name: Run CodeSpell
-        uses: codespell-project/actions-codespell@v2.0
+        uses: codespell-project/actions-codespell@v1.0
         with:
-          check_hidden: true
           check_filenames: true
           skip: package-lock.json,*.pdf

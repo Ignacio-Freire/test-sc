@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT 
-pragma solidity ^0.8.0;
+pragma solidity 0.8.18;
 
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
-contract ArgusWrappedToken is ERC20, Ownable {
+contract ArgusWrappedToken is ERC20, Ownable, ReentrancyGuard {
     event TransactionPending(address indexed from, address indexed to, uint256 amount, bytes32 transactionHash);
     event TransactionApproved(address indexed from, address indexed to, uint256 amount, bytes32 transactionHash);
     event TransactionRejected(address indexed from, address indexed to, uint256 amount, bytes32 transactionHash);
@@ -19,7 +20,7 @@ contract ArgusWrappedToken is ERC20, Ownable {
     // Governance contract address (Multi-Sig or DAO)
     address public governanceContract;
     // Nonce to make transaction hashes unique
-    uint256 public _nonce;
+    uint256 public nonce;
 
     constructor(
         string memory _name, 
@@ -39,14 +40,14 @@ contract ArgusWrappedToken is ERC20, Ownable {
     }
 
     // Override transfer() to include threshold and pending checks
-    function transfer(address to, uint256 amount) public override returns (bool) {
+    function transfer(address to, uint256 amount) public nonReentrant override returns (bool) {
         address sender = _msgSender();
         _transferWithCheck(sender, to, amount);
         return true;
     }
 
     // Override transferFrom() to include threshold and pending checks
-    function transferFrom(address from, address to, uint256 amount) public override returns (bool) {
+    function transferFrom(address from, address to, uint256 amount) public  nonReentrant override returns (bool){
         address spender = _msgSender();
         _spendAllowance(from, spender, amount);
         _transferWithCheck(from, to, amount);
@@ -57,7 +58,7 @@ contract ArgusWrappedToken is ERC20, Ownable {
     function _transferWithCheck(address from, address to, uint256 amount) internal {
         // Exclude governance contract
         if (from != governanceContract && to != governanceContract) { 
-            bytes32 txHash = keccak256(abi.encodePacked(from, to, amount, _nonce));
+            bytes32 txHash = keccak256(abi.encodePacked(from, to, amount, nonce));
 
             if (amount >= userThresholds[from] && !pendingTransactions[txHash]) {
                 pendingTransactions[txHash] = true;
@@ -74,10 +75,10 @@ contract ArgusWrappedToken is ERC20, Ownable {
     // Function to be called by the governance contract to approve a transaction
     function approveTransaction(address _from, address _to, uint256 _amount) public {
         require(msg.sender == governanceContract, "Only the governance contract can approve transactions");
-        bytes32 txHash = keccak256(abi.encodePacked(_from, _to, _amount, _nonce));
+        bytes32 txHash = keccak256(abi.encodePacked(_from, _to, _amount, nonce));
         if (pendingTransactions[txHash]) {
             delete pendingTransactions[txHash];
-            _nonce++;
+            nonce++;
             _transfer(_from, _to, _amount); 
             emit TransactionApproved(_from, _to, _amount, txHash); 
             return;
@@ -88,8 +89,9 @@ contract ArgusWrappedToken is ERC20, Ownable {
     // Function to be called by the governance contract to reject a transaction
     function rejectTransaction(address _from, address _to, uint256 _amount) public {
         require(msg.sender == governanceContract, "Only the governance contract can reject transactions");
-        bytes32 txHash = keccak256(abi.encodePacked(_from, _to, _amount, _nonce));
+        bytes32 txHash = keccak256(abi.encodePacked(_from, _to, _amount, nonce));
         if (pendingTransactions[txHash]) {
+            nonce++;
             delete pendingTransactions[txHash];
 
             emit TransactionRejected(_from, _to, _amount, txHash);
@@ -99,7 +101,7 @@ contract ArgusWrappedToken is ERC20, Ownable {
         revert("Transaction is not pending");
     }
 
-    function wrap(uint256 _amount, address _originalToken) public {
+    function wrap(uint256 _amount, address _originalToken) public nonReentrant{
         require(_amount > 0, "Wrap amount must be greater than zero");
 
         // Create an IERC20 instance for the original token
@@ -114,7 +116,7 @@ contract ArgusWrappedToken is ERC20, Ownable {
     }
 
     // Unwrap wrapped tokens 
-    function unwrap(uint256 _amount, address _originalToken) public {
+    function unwrap(uint256 _amount, address _originalToken) public nonReentrant{
         require(_amount > 0, "Unwrap amount must be greater than zero");
         require(balanceOf(msg.sender) >= _amount, "Insufficient wrapped token balance");
         

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.0;
+pragma solidity 0.8.18;
 
 import "forge-std/Test.sol";
 import "../src/ArgusWrapper.sol";
@@ -7,13 +7,13 @@ import "../src/mocks/ArgusGov.sol";
 import "../src/mocks/MockERC20.sol";
 
 contract ArgusWrappedTokenTest is Test {
-    ArgusWrappedToken argusWrappedToken;
-    MockGovernance mockGovernance;
-    MockERC20 originalToken;
+    ArgusWrappedToken public argusWrappedToken;
+    MockGovernance public mockGovernance;
+    MockERC20 public originalToken;
 
-    address alice = address(1);
-    address bob = address(2);
-    uint256 initialSupply = 1000 * 10 ** 18;
+    address public alice = address(1);
+    address public bob = address(2);
+    uint256 public initialSupply = 1000 * 10 ** 18;
 
     event TransactionPending(address indexed from, address indexed to, uint256 amount, bytes32 transactionHash);
 
@@ -74,7 +74,7 @@ contract ArgusWrappedTokenTest is Test {
 
         // Attempt a transfer that exceeds the threshold
         vm.expectEmit(true, true, true, true);
-        emit TransactionPending(alice, bob, transferAmount, keccak256(abi.encodePacked(alice, bob, transferAmount, argusWrappedToken._nonce())));
+        emit TransactionPending(alice, bob, transferAmount, keccak256(abi.encodePacked(alice, bob, transferAmount, argusWrappedToken.nonce())));
         argusWrappedToken.transfer(bob, transferAmount); 
         vm.stopPrank();
     }

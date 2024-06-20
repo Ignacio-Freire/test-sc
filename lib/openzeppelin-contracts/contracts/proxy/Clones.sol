@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: MIT
-// OpenZeppelin Contracts (last updated v5.0.0) (proxy/Clones.sol)
+// OpenZeppelin Contracts (last updated v4.9.0) (proxy/Clones.sol)
 
-pragma solidity ^0.8.20;
-
-import {Errors} from "../utils/Errors.sol";
+pragma solidity ^0.8.0;
 
 /**
- * @dev https://eips.ethereum.org/EIPS/eip-1167[ERC-1167] is a standard for
+ * @dev https://eips.ethereum.org/EIPS/eip-1167[EIP 1167] is a standard for
  * deploying minimal proxy contracts, also known as "clones".
  *
  * > To simply and cheaply clone contract functionality in an immutable way, this standard specifies
@@ -15,6 +13,8 @@ import {Errors} from "../utils/Errors.sol";
  * The library includes functions to deploy a proxy using either `create` (traditional deployment) or `create2`
  * (salted deterministic deployment). It also includes functions to predict the addresses of clones deployed using the
  * deterministic method.
+ *
+ * _Available since v3.4._
  */
 library Clones {
     /**
@@ -23,20 +23,6 @@ library Clones {
      * This function uses the create opcode, which should never revert.
      */
     function clone(address implementation) internal returns (address instance) {
-        return clone(implementation, 0);
-    }
-
-    /**
-     * @dev Same as {xref-Clones-clone-address-}[clone], but with a `value` parameter to send native currency
-     * to the new contract.
-     *
-     * NOTE: Using a non-zero value at creation will require the contract using this function (e.g. a factory)
-     * to always have enough balance for new deployments. Consider exposing this function under a payable method.
-     */
-    function clone(address implementation, uint256 value) internal returns (address instance) {
-        if (address(this).balance < value) {
-            revert Errors.InsufficientBalance(address(this).balance, value);
-        }
         /// @solidity memory-safe-assembly
         assembly {
             // Cleans the upper 96 bits of the `implementation` word, then packs the first 3 bytes
@@ -44,11 +30,9 @@ library Clones {
             mstore(0x00, or(shr(0xe8, shl(0x60, implementation)), 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000))
             // Packs the remaining 17 bytes of `implementation` with the bytecode after the address.
             mstore(0x20, or(shl(0x78, implementation), 0x5af43d82803e903d91602b57fd5bf3))
-            instance := create(value, 0x09, 0x37)
+            instance := create(0, 0x09, 0x37)
         }
-        if (instance == address(0)) {
-            revert Errors.FailedDeployment();
-        }
+        require(instance != address(0), "ERC1167: create failed");
     }
 
     /**
@@ -59,24 +43,6 @@ library Clones {
      * the clones cannot be deployed twice at the same address.
      */
     function cloneDeterministic(address implementation, bytes32 salt) internal returns (address instance) {
-        return cloneDeterministic(implementation, salt, 0);
-    }
-
-    /**
-     * @dev Same as {xref-Clones-cloneDeterministic-address-bytes32-}[cloneDeterministic], but with
-     * a `value` parameter to send native currency to the new contract.
-     *
-     * NOTE: Using a non-zero value at creation will require the contract using this function (e.g. a factory)
-     * to always have enough balance for new deployments. Consider exposing this function under a payable method.
-     */
-    function cloneDeterministic(
-        address implementation,
-        bytes32 salt,
-        uint256 value
-    ) internal returns (address instance) {
-        if (address(this).balance < value) {
-            revert Errors.InsufficientBalance(address(this).balance, value);
-        }
         /// @solidity memory-safe-assembly
         assembly {
             // Cleans the upper 96 bits of the `implementation` word, then packs the first 3 bytes
@@ -84,11 +50,9 @@ library Clones {
             mstore(0x00, or(shr(0xe8, shl(0x60, implementation)), 0x3d602d80600a3d3981f3363d3d373d3d3d363d73000000))
             // Packs the remaining 17 bytes of `implementation` with the bytecode after the address.
             mstore(0x20, or(shl(0x78, implementation), 0x5af43d82803e903d91602b57fd5bf3))
-            instance := create2(value, 0x09, 0x37, salt)
+            instance := create2(0, 0x09, 0x37, salt)
         }
-        if (instance == address(0)) {
-            revert Errors.FailedDeployment();
-        }
+        require(instance != address(0), "ERC1167: create2 failed");
     }
 
     /**
@@ -108,7 +72,7 @@ library Clones {
             mstore(ptr, 0x3d602d80600a3d3981f3363d3d373d3d3d363d73)
             mstore(add(ptr, 0x58), salt)
             mstore(add(ptr, 0x78), keccak256(add(ptr, 0x0c), 0x37))
-            predicted := and(keccak256(add(ptr, 0x43), 0x55), 0xffffffffffffffffffffffffffffffffffffffff)
+            predicted := keccak256(add(ptr, 0x43), 0x55)
         }
     }
 
