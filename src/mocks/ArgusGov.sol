@@ -10,7 +10,7 @@ import "../ArgusWrapper.sol";
 contract MockGovernance is Ownable {
     ArgusWrappedToken public argusWrappedToken;
 
-    constructor(address _argusWrappedToken) Ownable(msg.sender) {
+    constructor(address _argusWrappedToken) Ownable() {
         argusWrappedToken = ArgusWrappedToken(_argusWrappedToken);
     }
 

@@ -26,7 +26,7 @@ contract ArgusWrappedToken is ERC20, Ownable, ReentrancyGuard {
         string memory _name, 
         string memory _symbol, 
         address _governanceContract
-    ) ERC20(_name, _symbol) Ownable(msg.sender) {
+    ) ERC20(_name, _symbol) Ownable() {
         governanceContract = _governanceContract; 
     }
 
