@@ -15,6 +15,8 @@ contract ArgusWrappedTokenTest is Test {
     address bob = address(2);
     uint256 initialSupply = 1000 * 10 ** 18;
 
+    event TransactionPending(address indexed from, address indexed to, uint256 amount, bytes32 transactionHash);
+
     function setUp() public {
         // Deploy a mock ERC20 token to represent the original token
         originalToken = new MockERC20("Original Token", "OT");
@@ -71,7 +73,8 @@ contract ArgusWrappedTokenTest is Test {
         argusWrappedToken.wrap(transferAmount, address(originalToken));
 
         // Attempt a transfer that exceeds the threshold
-        vm.expectRevert("Transaction pending review");
+        vm.expectEmit(true, true, true, true);
+        emit TransactionPending(alice, bob, transferAmount, keccak256(abi.encodePacked(alice, bob, transferAmount, argusWrappedToken._nonce())));
         argusWrappedToken.transfer(bob, transferAmount); 
         vm.stopPrank();
     }
@@ -92,16 +95,16 @@ contract ArgusWrappedTokenTest is Test {
         vm.prank(alice);
         argusWrappedToken.transfer(bob, transferAmount);
 
-        uint256 aliceBalance = argusWrappedToken.balanceOf(alice);
-        uint256 bobBalance = argusWrappedToken.balanceOf(bob);
-
         // Approve the transaction as the governance contract
         vm.prank(address(mockGovernance));
         argusWrappedToken.approveTransaction(alice, bob, transferAmount);
 
+        uint256 aliceBalance = argusWrappedToken.balanceOf(alice);
+        uint256 bobBalance = argusWrappedToken.balanceOf(bob);
+
         // Check balances after successful approval
-        assertEq(argusWrappedToken.balanceOf(alice), aliceBalance); // Should be unchanged
-        assertEq(argusWrappedToken.balanceOf(bob), bobBalance + transferAmount);
+        assertEq(aliceBalance, 0); // Should be zero
+        assertEq(bobBalance, transferAmount);
     }
 
     // Test 4: Governance rejects pending transaction

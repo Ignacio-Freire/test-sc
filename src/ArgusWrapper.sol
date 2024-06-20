@@ -18,6 +18,8 @@ contract ArgusWrappedToken is ERC20, Ownable {
     mapping(bytes32 => bool) public pendingTransactions;
     // Governance contract address (Multi-Sig or DAO)
     address public governanceContract;
+    // Nonce to make transaction hashes unique
+    uint256 public _nonce;
 
     constructor(
         string memory _name, 
@@ -53,46 +55,48 @@ contract ArgusWrappedToken is ERC20, Ownable {
 
     // Internal function to perform transfers with security checks
     function _transferWithCheck(address from, address to, uint256 amount) internal {
-        // Exclude governance contract and owner
-        if (from != governanceContract && to != governanceContract && from != owner()) { 
+        // Exclude governance contract
+        if (from != governanceContract && to != governanceContract) { 
+            bytes32 txHash = keccak256(abi.encodePacked(from, to, amount, _nonce));
 
-            if (amount >= userThresholds[from] && 
-                !pendingTransactions[keccak256(abi.encodePacked(from, to, amount))]) {
-                
-                bytes32 txHash = keccak256(abi.encodePacked(from, to, amount));
+            if (amount >= userThresholds[from] && !pendingTransactions[txHash]) {
                 pendingTransactions[txHash] = true;
                 emit TransactionPending(from, to, amount, txHash);
-                revert("Transaction pending review"); 
+            } else {
+                _transfer(from, to, amount); // Execute the transfer if not pending
             }
+
+        } else {
+            _transfer(from, to, amount);
         }
-        _transfer(from, to, amount); // Execute the transfer if not pending
     }
 
     // Function to be called by the governance contract to approve a transaction
     function approveTransaction(address _from, address _to, uint256 _amount) public {
         require(msg.sender == governanceContract, "Only the governance contract can approve transactions");
-        bytes32 txHash = keccak256(abi.encodePacked(_from, _to, _amount));
-        require(pendingTransactions[txHash], "Transaction is not pending");
-
-        // Remove the transaction from pending 
-        delete pendingTransactions[txHash];
-
-        // Force the transfer directly 
-        _transfer(_from, _to, _amount); 
-        emit TransactionApproved(_from, _to, _amount, txHash); 
+        bytes32 txHash = keccak256(abi.encodePacked(_from, _to, _amount, _nonce));
+        if (pendingTransactions[txHash]) {
+            delete pendingTransactions[txHash];
+            _nonce++;
+            _transfer(_from, _to, _amount); 
+            emit TransactionApproved(_from, _to, _amount, txHash); 
+            return;
+        }
+        revert("Transaction is not pending");
     }
 
     // Function to be called by the governance contract to reject a transaction
     function rejectTransaction(address _from, address _to, uint256 _amount) public {
         require(msg.sender == governanceContract, "Only the governance contract can reject transactions");
-        bytes32 txHash = keccak256(abi.encodePacked(_from, _to, _amount));
-        require(pendingTransactions[txHash], "Transaction is not pending");
+        bytes32 txHash = keccak256(abi.encodePacked(_from, _to, _amount, _nonce));
+        if (pendingTransactions[txHash]) {
+            delete pendingTransactions[txHash];
 
-        // Remove the transaction from pending 
-        delete pendingTransactions[txHash];
-
-        emit TransactionRejected(_from, _to, _amount, txHash);
-        // No need to do anything else here, as the transaction was already blocked
+            emit TransactionRejected(_from, _to, _amount, txHash);
+            // No need to do anything else here, as the transaction was already blocked
+            return;
+        }
+        revert("Transaction is not pending");
     }
 
     function wrap(uint256 _amount, address _originalToken) public {
